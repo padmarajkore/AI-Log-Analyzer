@@ -1,0 +1,462 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>TypeSafe Log Guardian — AI Early Warning System</title>
+  <meta name="description" content="Real-time AI log analyzer with batch windowing. 100+ logs/sec ingestion, one Jev call per window.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div class="app-shell">
+
+    <!-- ── Top Nav ───────────────────────────────────────────────── -->
+    <header class="top-nav">
+      <div class="nav-brand">
+        <div class="brand-logo"><div class="logo-inner"></div></div>
+        <div class="brand-meta">
+          <span class="brand-title">TypeSafe <span class="accent-text">Log Guardian</span></span>
+          <span class="brand-subtitle">System One (Jev) · Batch Window AI Cockpit</span>
+        </div>
+      </div>
+      <div class="nav-controls">
+        <div class="status-pill" id="connectionStatus">
+          <span class="pulse-dot"></span>
+          <span class="status-label">Jev Active</span>
+          <span class="latency-tag" id="lastLatencyTag">~0ms</span>
+        </div>
+        <button class="btn btn-ghost-icon" id="openIntegrationBtn">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="16 18 22 12 16 6"></polyline><polyline points="8 6 2 12 8 18"></polyline></svg>
+          Integrate
+        </button>
+        <button class="btn btn-ghost-icon" id="openWhyAiBtn">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="16" x2="12" y2="12"></line><line x1="12" y1="8" x2="12.01" y2="8"></line></svg>
+          Why AI?
+        </button>
+      </div>
+    </header>
+
+    <!-- ── Simulator + Batch Config Bar ─────────────────────────── -->
+    <section class="simulator-bar" id="simulatorBar">
+      <div class="simulator-left">
+        <div class="sim-pulse-dot" id="simPulseDot"></div>
+        <div class="sim-info">
+          <div class="sim-title-wrap">
+            <span class="sim-title">⚡ Live Traffic Simulator</span>
+            <span class="sim-badge badge-idle" id="simStatusBadge">STOPPED</span>
+            <span class="sim-gen-count" id="simGenCount"></span>
+          </div>
+          <span class="sim-subtitle">12 microservices · 80+ log templates · 100+ logs/sec capable</span>
+        </div>
+      </div>
+      <div class="simulator-controls">
+        <!-- Sim Rate -->
+        <div class="sim-speed-selector">
+          <label for="simSpeedSelect">Sim rate:</label>
+          <select id="simSpeedSelect" class="select-input-sm">
+            <option value="800">~1/s</option>
+            <option value="400">~2.5/s</option>
+            <option value="100">~10/s</option>
+            <option value="20">~50/s</option>
+            <option value="10" selected>~100/s</option>
+            <option value="5">~200/s</option>
+          </select>
+        </div>
+        <!-- Batch Window -->
+        <div class="sim-speed-selector">
+          <label for="batchWindowSelect">Batch window:</label>
+          <select id="batchWindowSelect" class="select-input-sm">
+            <option value="1000">1 second</option>
+            <option value="2000" selected>2 seconds</option>
+            <option value="5000">5 seconds</option>
+            <option value="10000">10 seconds</option>
+          </select>
+        </div>
+        <button class="btn btn-sim-toggle" id="toggleSimulatorBtn">
+          <span id="simBtnIcon">▶</span>
+          <span id="simBtnText">Start</span>
+        </button>
+      </div>
+    </section>
+
+    <!-- ── KPI Grid ──────────────────────────────────────────────── -->
+    <section class="kpi-grid">
+      <div class="kpi-card">
+        <div class="kpi-icon-wrap icon-blue">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"></polyline></svg>
+        </div>
+        <div class="kpi-content">
+          <span class="kpi-label">Raw Logs/sec</span>
+          <span class="kpi-value" id="kpiRawRate">0</span>
+        </div>
+      </div>
+      <div class="kpi-card">
+        <div class="kpi-icon-wrap icon-indigo">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="3" width="20" height="14" rx="2"></rect><line x1="8" y1="21" x2="16" y2="21"></line><line x1="12" y1="17" x2="12" y2="21"></line></svg>
+        </div>
+        <div class="kpi-content">
+          <span class="kpi-label">Total Ingested</span>
+          <span class="kpi-value" id="kpiTotalLogs">0</span>
+        </div>
+      </div>
+      <div class="kpi-card">
+        <div class="kpi-icon-wrap icon-cyan">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path></svg>
+        </div>
+        <div class="kpi-content">
+          <span class="kpi-label">Batches Analyzed</span>
+          <span class="kpi-value alert-cyan-text" id="kpiBatchCount">0</span>
+        </div>
+      </div>
+      <div class="kpi-card">
+        <div class="kpi-icon-wrap icon-red">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path></svg>
+        </div>
+        <div class="kpi-content">
+          <span class="kpi-label">Critical Batches</span>
+          <span class="kpi-value alert-red-text" id="kpiCriticalBatches">0</span>
+        </div>
+      </div>
+      <div class="kpi-card">
+        <div class="kpi-icon-wrap icon-purple">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"></polygon></svg>
+        </div>
+        <div class="kpi-content">
+          <span class="kpi-label">Jev Latency</span>
+          <span class="kpi-value alert-purple-text" id="kpiAvgLatency">— ms</span>
+        </div>
+      </div>
+    </section>
+
+    <!-- ── Main Cockpit ──────────────────────────────────────────── -->
+    <main class="cockpit-container">
+
+      <!-- Left: Raw log firehose + presets -->
+      <section class="left-panel">
+
+        <!-- Quick Test Scenarios -->
+        <div class="panel-card presets-card">
+          <div class="panel-header">
+            <h3>⚡ Quick Test Scenarios</h3>
+            <span class="header-hint">1-click log to batch analyze</span>
+          </div>
+          <div class="scenario-buttons" id="scenarioButtons">
+            <div class="skeleton-row"></div>
+            <div class="skeleton-row"></div>
+          </div>
+        </div>
+
+        <!-- Custom log input -->
+        <div class="panel-card log-input-card">
+          <div class="panel-header">
+            <h3>📝 Custom Log Inspector</h3>
+            <div class="service-selector-wrap">
+              <input type="text" id="serviceInput" value="payment-gateway" class="text-input-sm">
+              <select id="levelInput" class="select-input-sm">
+                <option value="ERROR">ERROR</option>
+                <option value="WARN">WARN</option>
+                <option value="INFO" selected>INFO</option>
+                <option value="DEBUG">DEBUG</option>
+              </select>
+            </div>
+          </div>
+          <div class="input-form">
+            <textarea id="logMessageInput" placeholder="Paste any backend log line here…" rows="3"></textarea>
+            <div class="form-actions">
+              <span class="token-hint">Single-log deep analysis</span>
+              <button class="btn btn-primary" id="analyzeBtn">
+                <span class="btn-text">Analyze with Jev</span>
+                <span class="btn-spinner hidden" id="analyzeSpinner"></span>
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Raw log firehose counter -->
+        <div class="panel-card firehose-card">
+          <div class="panel-header">
+            <div class="stream-title-wrap">
+              <h3>🔥 Raw Ingest Firehose</h3>
+              <span class="badge-pill" id="rawLogCounter">0 total</span>
+            </div>
+            <label class="toggle-wrap" title="Pause raw log display">
+              <input type="checkbox" id="showRawToggle" checked>
+              <span class="toggle-track"><span class="toggle-thumb"></span></span>
+              <span class="toggle-label">Show</span>
+            </label>
+          </div>
+          <!-- Rate bar -->
+          <div class="rate-bar-wrap">
+            <div class="rate-bar-fill" id="rateBarFill" style="width:0%"></div>
+          </div>
+          <div class="rate-bar-labels">
+            <span id="rateBarLabel">0 logs/sec</span>
+            <span class="rate-bar-max">Max: 200/s</span>
+          </div>
+          <!-- Mini log ticker -->
+          <div class="log-ticker" id="logTicker">
+            <div class="ticker-empty">Waiting for logs…</div>
+          </div>
+        </div>
+      </section>
+
+      <!-- Right: Batch analysis results -->
+      <section class="right-panel">
+
+        <!-- Batch result inspector -->
+        <div class="panel-card batch-inspector" id="batchInspector">
+          <div class="batch-empty" id="batchEmptyState">
+            <div class="empty-icon-ring">
+              <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="8" x2="12" y2="12"></line><line x1="12" y1="16" x2="12.01" y2="16"></line></svg>
+            </div>
+            <h4>Waiting for Batch</h4>
+            <p>Start the simulator. Every batch window Jev will analyze ALL logs together and report here.</p>
+          </div>
+
+          <div class="batch-content hidden" id="batchContent">
+            <!-- Batch header -->
+            <div class="batch-header-row">
+              <div class="batch-id-wrap">
+                <span class="batch-label">BATCH RESULT</span>
+                <span class="batch-id" id="batchId">—</span>
+              </div>
+              <div class="batch-meta-pills">
+                <span class="meta-pill" id="batchLogCount">— logs</span>
+                <span class="meta-pill" id="batchWindow">—s window</span>
+                <span class="meta-pill" id="batchLatency">— ms</span>
+              </div>
+            </div>
+
+            <!-- System health gauge -->
+            <div class="health-gauge-section">
+              <div class="health-gauge-header">
+                <span class="gauge-title">System Health Score</span>
+                <span class="gauge-subtitle">Jev holistic assessment of all logs in window</span>
+              </div>
+              <div class="health-gauge-row">
+                <div class="health-score-circle" id="healthScoreCircle">
+                  <span class="health-score-num" id="healthScoreNum">—</span>
+                  <span class="health-score-denom">/10</span>
+                </div>
+                <div class="health-gauge-right">
+                  <div class="health-bar-wrap">
+                    <div class="health-bar-fill" id="healthBarFill" style="width:0%"></div>
+                  </div>
+                  <div class="health-label-row">
+                    <span class="health-label" id="healthLabel">—</span>
+                    <span class="urgency-badge" id="urgencyBadge">—</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Top threats -->
+            <div class="threats-section">
+              <div class="section-title">
+                <span>Top Threats in Window</span>
+                <span class="badge-sm badge-indigo" id="threatCount">0 found</span>
+              </div>
+              <div class="threats-list" id="threatsList"></div>
+            </div>
+
+            <!-- Services at risk -->
+            <div class="services-section" id="servicesSection">
+              <div class="section-title"><span>Services Flagged</span></div>
+              <div class="services-list" id="servicesList"></div>
+            </div>
+
+            <!-- Jev narrative -->
+            <div class="narrative-section">
+              <div class="section-title"><span>Jev Batch Narrative</span></div>
+              <div class="narrative-box" id="narrativeBox"></div>
+            </div>
+
+            <!-- Window log breakdown (mini table) -->
+            <div class="breakdown-section">
+              <div class="section-title">
+                <span>Window Log Breakdown</span>
+                <span class="badge-sm" id="breakdownCount"></span>
+              </div>
+              <div class="breakdown-table" id="breakdownTable"></div>
+            </div>
+
+            <!-- Telemetry footer -->
+            <div class="telemetry-footer">
+              <span class="meta-item">Model: <strong id="metaModelName">jev</strong></span>
+              <span class="meta-item">Latency: <strong id="metaLatency">—</strong></span>
+              <span class="meta-item">Tokens in: <strong id="metaInputTokens">—</strong></span>
+              <span class="meta-item">Out: <strong id="metaOutputTokens">0 (free)</strong></span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Single-log inspector (for manual analyze) -->
+        <div class="panel-card inspector-card hidden" id="singleInspectorCard">
+          <div class="inspector-content" id="inspectorContent">
+            <div class="alert-banner" id="inspectorAlertBanner">
+              <div class="alert-icon-wrap" id="alertIconWrap"></div>
+              <div class="alert-meta">
+                <h4 id="alertHeadline">—</h4>
+                <p id="alertReasonText">—</p>
+              </div>
+              <div class="alert-badge" id="alertUrgencyBadge">—</div>
+            </div>
+            <div class="inspector-section">
+              <div class="section-title">
+                <span>Sanitized Payload</span>
+                <span class="badge-sm" id="redactionBadge">—</span>
+              </div>
+              <pre class="code-box" id="redactedMessageBox"></pre>
+            </div>
+            <div class="judgments-grid">
+              <div class="judgment-box">
+                <div class="judgment-header"><span class="judgment-title">Outage Probability</span><span class="primitive-tag">Noul</span></div>
+                <div class="progress-bar-wrap"><div class="progress-bar-fill" id="outageProgressBar" style="width:0%"></div></div>
+                <div class="judgment-stat"><span class="stat-number" id="outageProbText">0%</span><span class="stat-desc" id="outageRiskDesc">Low</span></div>
+              </div>
+              <div class="judgment-box">
+                <div class="judgment-header"><span class="judgment-title">Leak Detection</span><span class="primitive-tag">Choice</span></div>
+                <div class="choice-value-wrap"><span class="leak-type-badge badge-safe" id="leakTypeBadge">NONE</span><span class="confidence-tag" id="leakConfidenceTag">—</span></div>
+                <div class="probability-bars" id="leakProbabilityBars"></div>
+              </div>
+              <div class="judgment-box">
+                <div class="judgment-header"><span class="judgment-title">Severity Score</span><span class="primitive-tag">Score</span></div>
+                <div class="score-display"><span class="score-large" id="severityScoreText">—</span><span class="score-scale">/ 5</span></div>
+                <div class="score-dots" id="severityDots"><span class="dot"></span><span class="dot"></span><span class="dot"></span><span class="dot"></span><span class="dot"></span></div>
+              </div>
+              <div class="judgment-box">
+                <div class="judgment-header"><span class="judgment-title">Recommended Action</span><span class="primitive-tag">Choice</span></div>
+                <div class="action-pill" id="actionPill"><span class="action-text" id="actionText">—</span></div>
+                <div class="domain-tag-wrap"><span class="domain-label">Domain:</span><span class="domain-badge" id="failureDomainBadge">—</span></div>
+              </div>
+            </div>
+            <div class="telemetry-footer">
+              <span class="meta-item">Model: <strong id="singleMetaModelName">jev</strong></span>
+              <span class="meta-item">Latency: <strong id="singleMetaLatency">—</strong></span>
+              <span class="meta-item">Tokens: <strong id="singleMetaTokens">—</strong></span>
+            </div>
+          </div>
+        </div>
+
+      </section>
+    </main>
+  </div>
+
+  <!-- ── Integration Modal ──────────────────────────────────────── -->
+  <div class="modal-backdrop hidden" id="integrationModal">
+    <div class="modal-card">
+      <div class="modal-header">
+        <h3>🚀 Integrate With Your Application</h3>
+        <button class="modal-close-btn" id="closeModalBtn">&times;</button>
+      </div>
+      <div class="modal-body">
+        <p class="modal-intro">Send a batch of logs (e.g. all logs from the last 2 seconds) in one POST:</p>
+        <div class="tab-row">
+          <button class="tab-btn active" data-tab="tab-node">Node.js</button>
+          <button class="tab-btn" data-tab="tab-python">Python</button>
+          <button class="tab-btn" data-tab="tab-curl">cURL</button>
+        </div>
+        <div class="tab-pane active" id="tab-node">
+          <pre class="code-snippet"><code>// Accumulate logs for 2s then send batch
+const buffer = [];
+const WINDOW_MS = 2000;
+
+logger.on('data', (log) => buffer.push(log));
+
+setInterval(async () => {
+  if (buffer.length === 0) return;
+  const batch = buffer.splice(0, buffer.length);
+  await fetch('http://localhost:3000/api/logs/batch', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ logs: batch, windowMs: WINDOW_MS })
+  });
+}, WINDOW_MS);</code></pre>
+        </div>
+        <div class="tab-pane hidden" id="tab-python">
+          <pre class="code-snippet"><code>import threading, requests, time
+
+buffer = []
+WINDOW_SEC = 2
+
+def flush():
+    while True:
+        time.sleep(WINDOW_SEC)
+        if not buffer: continue
+        batch = buffer[:]
+        buffer.clear()
+        requests.post('http://localhost:3000/api/logs/batch', json={
+            'logs': batch, 'windowMs': WINDOW_SEC * 1000
+        }, timeout=10)
+
+threading.Thread(target=flush, daemon=True).start()</code></pre>
+        </div>
+        <div class="tab-pane hidden" id="tab-curl">
+          <pre class="code-snippet"><code>curl -X POST http://localhost:3000/api/logs/batch \
+  -H "Content-Type: application/json" \
+  -d '{
+    "windowMs": 2000,
+    "logs": [
+      { "service": "auth", "level": "ERROR", "message": "DB connect failed: postgresql://admin:secret@db:5432/prod" },
+      { "service": "api", "level": "WARN", "message": "Pool timeout: active=50 idle=0 waiting=284" },
+      { "service": "cache", "level": "INFO", "message": "Cache HIT session:usr_12345" }
+    ]
+  }'</code></pre>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── Why AI Modal ───────────────────────────────────────────── -->
+  <div class="modal-backdrop hidden" id="whyAiModal">
+    <div class="modal-card modal-wide">
+      <div class="modal-header">
+        <h3>🧠 Why Batch AI over Regex/Rules?</h3>
+        <button class="modal-close-btn" id="closeWhyAiBtn">&times;</button>
+      </div>
+      <div class="modal-body">
+        <div class="why-ai-grid">
+          <div class="why-card why-no">
+            <div class="why-card-header"><span class="why-icon">📏</span><span class="why-title">Traditional Regex / Rules</span></div>
+            <ul class="why-list">
+              <li>✅ Catches <code>password=abc123</code> — keyword match</li>
+              <li>✅ Catches <code>OOM error</code> — exact string</li>
+              <li>✅ Free to run — no API cost</li>
+              <li>❌ Misses <code>"my DB creds are admin/secret"</code></li>
+              <li>❌ Can't detect cross-log patterns in a batch</li>
+              <li>❌ Can't score overall system health across 100 logs</li>
+              <li>❌ 50 busy connections — critical or not? Depends on context</li>
+              <li>❌ New log format = new rules to write</li>
+              <li>❌ No holistic "is this window about to cause an outage?" judgment</li>
+            </ul>
+          </div>
+          <div class="why-card why-yes">
+            <div class="why-card-header"><span class="why-icon">🧠</span><span class="why-title">TypeSafe Jev — Batch Window</span></div>
+            <ul class="why-list">
+              <li>✅ One API call analyses <strong>100+ logs</strong> together</li>
+              <li>✅ Sees cross-log correlations: DB pool exhaustion + OOM + disk full = CRITICAL cascade</li>
+              <li>✅ System health score across the entire window</li>
+              <li>✅ Understands slang, abbreviations, any language/framework</li>
+              <li>✅ Context-aware severity: same log = different risk in different apps</li>
+              <li>✅ Output tokens = 0 → <strong>you only pay for input</strong></li>
+              <li>✅ Cost per 100-log batch: ~$0.05–0.10 vs breach cost: $100K+</li>
+              <li>✅ No maintenance — works on log formats you've never seen</li>
+            </ul>
+          </div>
+        </div>
+        <div class="why-bottom">
+          <div class="why-verdict">
+            <span class="verdict-icon">⚖️</span>
+            <div><strong>The killer feature of batch mode:</strong> Jev reads ALL 100 logs in the window holistically. It can say "3 services are showing simultaneous resource exhaustion — this is a coordinated cascade, wake up on-call NOW" — something per-log rules can never do because each log looks individually innocent.</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script src="app.js"></script>
+</body>
+</html>
